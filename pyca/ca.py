@@ -189,10 +189,27 @@ def start_capture(schedule):
     # Set state
     register_ca(status='capturing')
     recording_state(recording_id, 'capturing')
+    
+    # retrieve workflow config properties before recording
+    attachments = schedule[-1].get('attach')
+    liverecord = ''
+    liveformat = ''
+    for attachment in attachments:
+        value = b64decode(attachment.decode())
+        if not value.startswith('<'):
+            workflow_def, workflow_config = get_config_params(value)
+            for config in workflow_config:
+                if config[0] == 'liverecord':
+                    liverecord = config[1]
+                    logging.info('retrieved liverecord property : %s : %s', config[0], config[1])
+                if config[0] == 'liveformat':
+                    liveformat = config[1]
+                    logging.info('retrieved liveformat property : %s : %s', config[0], config[1])
+    # end retrieve config 
 
     tracks = []
     try:
-        tracks = recording_command(recording_dir, recording_name, duration)
+        tracks = recording_command(recording_dir, recording_name, duration, liverecord, liveformat)
     except:
         logging.error('Recording command failed')
         logging.error(traceback.format_exc())
@@ -385,7 +402,7 @@ def control_loop():
         time.sleep(1.0)
 
 
-def recording_command(directory, name, duration):
+def recording_command(directory, name, duration, liverecord='record', liveformat='camera'):
     '''Run the actual command to record the a/v material.
     '''
     preview_dir = CONFIG['capture']['preview_dir']
@@ -394,6 +411,8 @@ def recording_command(directory, name, duration):
     cmd = cmd.replace('{{dir}}', directory)
     cmd = cmd.replace('{{name}}', name)
     cmd = cmd.replace('{{previewdir}}', preview_dir)
+    cmd = cmd.replace('{{liverecord}}', liverecord)
+    cmd = cmd.replace('{{liveformat}}', liveformat)
     logging.info(cmd)
     if os.system(cmd):
         raise Exception('Recording failed')
